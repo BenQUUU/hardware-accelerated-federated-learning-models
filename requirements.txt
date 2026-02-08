@@ -1,0 +1,5 @@
+flwr>=1.5.0
+numpy
+Pillow
+protobuf
+grpcio
