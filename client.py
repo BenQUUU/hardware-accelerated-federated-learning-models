@@ -29,7 +29,7 @@ class FlowerClient(fl.client.NumPyClient):
         net.load_state_dict(state_dict, strict=True)
 
         start_time = time.time()
-        centralized.train(net, trainloader, epochs=1, device=DEVICE)
+        centralized.train(net, trainloader, epochs=5, device=DEVICE)
         end_time = time.time()
         
         duration = end_time - start_time
