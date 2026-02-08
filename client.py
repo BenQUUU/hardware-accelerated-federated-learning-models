@@ -33,9 +33,12 @@ class FlowerClient(fl.client.NumPyClient):
         end_time = time.time()
         
         duration = end_time - start_time
-        print(f"Training finished in {duration:.4f}s")
+        print(f"Client {args.cid} training finished in {duration:.4f}s")
 
-        return self.get_parameters({}), len(trainloader.dataset), {"train_time": duration}
+        return self.get_parameters({}), len(trainloader.dataset), {
+            "train_time": duration, 
+            "cid": args.cid
+        }
 
     def evaluate(self, parameters, config):
         return 0.0, len(trainloader.dataset), {"accuracy": 0.0}

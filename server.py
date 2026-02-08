@@ -31,15 +31,21 @@ def get_evaluate_fn(data_path):
     return evaluate
 
 def fit_metrics_aggregation_fn(fit_metrics: List[Tuple[int, Metrics]]) -> Metrics:
-    train_times = [metrics["train_time"] for _, metrics in fit_metrics]
-
+    client_stats = []
+    for _, metrics in fit_metrics:
+        client_stats.append((metrics["cid"], metrics["train_time"]))
+    
+    client_stats.sort(key=lambda x: x[0])
+    
+    train_times = [time for _, time in client_stats]
     max_time = max(train_times)
     avg_time = sum(train_times) / len(train_times)
     
-    print(f"\n--- CLIENT METRICS ---")
-    print(f"Client times: {train_times}")
-    print(f"Round Max Time: {max_time:.4f}s")
-    print(f"----------------------\n")
+    print(f"\n--- CLIENT PERFORMANCE ---")
+    for cid, time in client_stats:
+        print(f"Client {cid}: {time:.4f}s")
+    print(f"Round Max (Straggler): {max_time:.4f}s")
+    print(f"--------------------------\n")
     
     return {"max_train_time": max_time, "avg_train_time": avg_time}
 
