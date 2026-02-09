@@ -7,31 +7,32 @@ from PIL import Image
 import glob
 import os
 
-IMG_SIZE = 128
+IMG_SIZE = 256
 LATENT_DIM = 32
 
 class Autoencoder(nn.Module):
     def __init__(self):
         super(Autoencoder, self).__init__()
+        # Input: 3 x 256 x 256
         self.encoder = nn.Sequential(
-            nn.Conv2d(3, 16, 3, stride=2, padding=1),  # 64x64
+            nn.Conv2d(3, 32, 3, stride=2, padding=1),  # -> 128x128
             nn.ReLU(),
-            nn.Conv2d(16, 32, 3, stride=2, padding=1), # 32x32
+            nn.Conv2d(32, 64, 3, stride=2, padding=1),  # -> 64x64
             nn.ReLU(),
-            nn.Conv2d(32, 64, 3, stride=2, padding=1), # 16x16
+            nn.Conv2d(64, 128, 3, stride=2, padding=1),  # -> 32x32
             nn.ReLU(),
-            nn.Conv2d(64, 128, 7) # 10x10 -> Bottleneck
+            nn.Conv2d(128, 256, 7)  # Kernel 7x7
         )
-        # Decoder
+
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(128, 64, 7),
+            nn.ConvTranspose2d(256, 128, 7),
+            nn.ReLU(),
+            nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1, output_padding=1),
             nn.ReLU(),
             nn.ConvTranspose2d(64, 32, 3, stride=2, padding=1, output_padding=1),
             nn.ReLU(),
-            nn.ConvTranspose2d(32, 16, 3, stride=2, padding=1, output_padding=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(16, 3, 3, stride=2, padding=1, output_padding=1),
-            nn.Sigmoid() # 0-1
+            nn.ConvTranspose2d(32, 3, 3, stride=2, padding=1, output_padding=1),
+            nn.Sigmoid()
         )
 
     def forward(self, x):
