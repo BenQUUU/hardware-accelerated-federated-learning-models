@@ -19,25 +19,37 @@ print(f"Client {args.cid} starting on device: {DEVICE}")
 net = centralized.Autoencoder().to(DEVICE)
 trainloader = centralized.load_partitioned_data(args.cid, args.total_clients, args.data_path)
 
+def set_parameters(model, parameters):
+    params_dict = zip(model.state_dict().keys(), parameters)
+    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+    model.load_state_dict(state_dict, strict=True)
+
 class FlowerClient(fl.client.NumPyClient):
     def get_parameters(self, config):
         return [val.cpu().numpy() for _, val in net.state_dict().items()]
 
     def fit(self, parameters, config):
-        params_dict = zip(net.state_dict().keys(), parameters)
-        state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
-        net.load_state_dict(state_dict, strict=True)
+        set_parameters(net, parameters)
+
+        timeout = float(config.get("timeout", 15.0))
+
+        print(f"[Client {args.cid}] Starting training for {timeout}s...")
 
         start_time = time.time()
-        centralized.train(net, trainloader, epochs=5, device=DEVICE)
-        end_time = time.time()
-        
-        duration = end_time - start_time
-        print(f"Client {args.cid} training finished in {duration:.4f}s")
 
-        return self.get_parameters({}), len(trainloader.dataset), {
-            "train_time": duration, 
-            "cid": args.cid
+        epochs_done, num_examples = centralized.train_by_time(
+            net, trainloader, timeout=timeout, device=DEVICE
+        )
+
+        end_time = time.time()
+        duration = end_time - start_time
+
+        print(f"[Client {args.cid}] Finished. Epochs: {epochs_done}. Time: {duration:.2f}s")
+
+        return self.get_parameters({}), num_examples, {
+            "train_time": duration,
+            "cid": args.cid,
+            "epochs_done": epochs_done
         }
 
     def evaluate(self, parameters, config):

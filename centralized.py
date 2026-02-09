@@ -6,6 +6,7 @@ from torchvision import transforms
 from PIL import Image
 import glob
 import os
+import time
 
 IMG_SIZE = 256
 LATENT_DIM = 32
@@ -91,9 +92,6 @@ def load_partitioned_data(cid, total_clients, data_path, batch_size=8):
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 def load_test_data(data_path, batch_size=32):
-    """
-    Ładuje cały set testowy (tylko dla serwera do ewaluacji).
-    """
     files = get_files(data_path, split="test")
     transform = transforms.Compose([
         transforms.Resize((IMG_SIZE, IMG_SIZE)),
@@ -103,7 +101,6 @@ def load_test_data(data_path, batch_size=32):
     return DataLoader(dataset, batch_size=batch_size)
 
 def train(net, trainloader, epochs, device):
-    """Pętla treningowa"""
     criterion = nn.MSELoss()
     optimizer = optim.Adam(net.parameters(), lr=0.001)
     net.train()
@@ -120,7 +117,6 @@ def train(net, trainloader, epochs, device):
             epoch_loss += loss.item()
 
 def test(net, testloader, device):
-    """Ewaluacja (Reconstruction Error)"""
     criterion = nn.MSELoss()
     total_loss = 0.0
     steps = 0
@@ -133,3 +129,30 @@ def test(net, testloader, device):
             total_loss += loss.item()
             steps += 1
     return total_loss / steps
+
+
+def train_by_time(net, trainloader, timeout, device):
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(net.parameters(), lr=0.001)
+    net.train()
+
+    start_time = time.time()
+    epochs_done = 0
+    total_images = 0
+
+    while (time.time() - start_time) < timeout:
+        for images, _ in trainloader:
+            images = images.to(device)
+            optimizer.zero_grad()
+            outputs = net(images)
+            loss = criterion(outputs, images)
+            loss.backward()
+            optimizer.step()
+            total_images += len(images)
+
+            if (time.time() - start_time) > timeout:
+                break
+        else:
+            epochs_done += 1
+
+    return epochs_done, total_images

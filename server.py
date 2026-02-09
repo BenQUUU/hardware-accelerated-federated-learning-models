@@ -30,24 +30,26 @@ def get_evaluate_fn(data_path):
 
     return evaluate
 
+def fit_config(server_round: int):
+    return {
+        "timeout": 16.0,
+        "current_round": server_round,
+    }
+
 def fit_metrics_aggregation_fn(fit_metrics: List[Tuple[int, Metrics]]) -> Metrics:
-    client_stats = []
-    for _, metrics in fit_metrics:
-        client_stats.append((metrics["cid"], metrics["train_time"]))
-    
-    client_stats.sort(key=lambda x: x[0])
-    
-    train_times = [time for _, time in client_stats]
-    max_time = max(train_times)
-    avg_time = sum(train_times) / len(train_times)
-    
-    print(f"\n--- CLIENT PERFORMANCE ---")
-    for cid, time in client_stats:
-        print(f"Client {cid}: {time:.4f}s")
-    print(f"Round Max (Straggler): {max_time:.4f}s")
-    print(f"--------------------------\n")
-    
-    return {"max_train_time": max_time, "avg_train_time": avg_time}
+    stats = []
+    for _, m in fit_metrics:
+        stats.append((m["cid"], m["train_time"], m["epochs_done"]))
+
+    stats.sort(key=lambda x: x[0])
+
+    print(f"\n--- ADAPTIVE TRAINING RESULTS ---")
+    print(f"ID | Time (s) | Epochs Done")
+    for cid, time, epochs in stats:
+        print(f" {cid} |  {time:.2f}   |   {epochs}")
+    print(f"---------------------------------")
+
+    return {"dummy": 0}
 
 strategy = fl.server.strategy.FedAvg(
     evaluate_fn=get_evaluate_fn(args.data_path),
