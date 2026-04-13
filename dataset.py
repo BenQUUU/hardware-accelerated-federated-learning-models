@@ -55,38 +55,32 @@ def get_test_files_and_labels(data_path):
             labels.append(1)
     return files, labels
 
+
 def load_partitioned_data(cid, total_clients, data_path, batch_size=8):
     files = get_files(data_path, split="train")
     total_files = len(files)
     if total_files == 0:
         raise ValueError(f"Nie znaleziono plików w {data_path}. Sprawdź ścieżkę!")
 
-    if cid == 0:
-        start_idx = 0
-        end_idx = int(total_files * 0.7)
-    else:
-        start_idx = int(total_files * 0.7)
+    partition_size = total_files // total_clients
+    start_idx = cid * partition_size
+
+    if cid == total_clients - 1:
         end_idx = total_files
+    else:
+        end_idx = start_idx + partition_size
 
     my_files = files[start_idx:end_idx]
     print(f"[Client {cid}] Loading {len(my_files)} images (Index: {start_idx}-{end_idx})")
 
-    base_transforms = [
+    client_transform = transforms.Compose([
         transforms.Resize((IMG_SIZE, IMG_SIZE)),
-        transforms.RandomRotation(180), # Augmentacja obrotu
-        transforms.RandomHorizontalFlip(), # Augmentacja odbicia
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
         transforms.ToTensor(),
-    ]
+    ])
 
-    if cid == 0:
-        client_transform = transforms.Compose(base_transforms)
-        print(f"[Client {cid}] Non-IID Profile: Ideal Conditions")
-    else:
-        client_transform = transforms.Compose([
-            transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2),
-            *base_transforms
-        ])
-        print(f"[Client {cid}] Non-IID Profile: Degraded Sensor / Lighting")
+    print(f"[Client {cid}] IID Profile: Równe i czyste dane (Brak ColorJitter)")
 
     dataset = MVTecDataset(my_files, transform=client_transform)
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)
