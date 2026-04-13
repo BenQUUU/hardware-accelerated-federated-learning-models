@@ -112,7 +112,10 @@ if __name__ == "__main__":
         fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
         on_fit_config_fn=get_on_fit_config_fn(timeout_seconds=args.timeout),
         min_fit_clients=args.min_clients,
-        min_available_clients=args.total_clients
+
+        min_available_clients=args.min_clients,
+
+        fraction_evaluate=0.0,
     )
 
     print(f"Starting Server on {DEVICE}. Waiting for {args.total_clients} clients...")
