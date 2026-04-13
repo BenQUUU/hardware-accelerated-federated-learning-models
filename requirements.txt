@@ -4,3 +4,6 @@ Pillow
 protobuf
 grpcio
 matplotlib
+scikit-learn
+psutil
+nvidia-ml-py
