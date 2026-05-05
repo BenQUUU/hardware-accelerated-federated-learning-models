@@ -19,6 +19,7 @@ parser.add_argument("--total_clients", type=int, default=2, help="Total expected
 parser.add_argument("--exp_name", type=str, default="baseline", help="Experiment name for CSV/Plots")
 parser.add_argument("--timeout", type=float, default=20.0, help="Client training timeout in seconds")
 parser.add_argument("--rounds", type=int, default=10, help="Number of federated rounds")
+parser.add_argument("--extractor", type=str, choices=["mobilenet", "shufflenet", "squeezenet"], default="mobilenet", help="It must be the same as the customers")
 args = parser.parse_args()
 
 engine.set_seed()
@@ -36,7 +37,7 @@ with open(csv_filename, mode='w', newline='') as f:
 csv_hw_filename = f"hw_metrics_{args.exp_name}.csv"
 with open(csv_hw_filename, mode='w', newline='') as f:
     writer = csv.writer(f)
-    writer.writerow(["Round", "Client_ID", "Train_Time_s", "Epochs", "CPU_%", "RAM_%", "GPU_%", "VRAM_%"])
+    writer.writerow(["Round", "Client_ID", "Train_Time_s", "Epochs", "CPU_%", "RAM_%", "GPU_%", "VRAM_%", "Power_W"])
 
 def get_on_fit_config_fn(timeout_seconds: float):
     def fit_config(server_round: int):
@@ -47,7 +48,7 @@ def get_evaluate_fn(data_path):
     testloader = dataset.load_test_data(data_path)
 
     def evaluate(server_round: int, parameters: fl.common.NDArrays, config: dict):
-        net = model.Autoencoder().to(DEVICE)
+        net = model.Autoencoder(extractor_name=args.extractor).to(DEVICE)
         
         # Modyfikacja wczytywania częściowych wag
         trainable_keys = [k for k in net.state_dict().keys() if "encoder" not in k]
@@ -68,10 +69,11 @@ def get_evaluate_fn(data_path):
         return avg_mse, {"auroc": auroc}
     return evaluate
 
+
 def fit_metrics_aggregation_fn(fit_metrics: List[Tuple[int, Metrics]]) -> Metrics:
     global current_fit_round
     stats = []
-    
+
     for _, m in fit_metrics:
         stats.append({
             "cid": m.get("cid", -1),
@@ -80,22 +82,24 @@ def fit_metrics_aggregation_fn(fit_metrics: List[Tuple[int, Metrics]]) -> Metric
             "cpu": m.get("avg_cpu_percent", 0.0),
             "ram": m.get("avg_ram_percent", 0.0),
             "gpu": m.get("avg_gpu_percent", 0.0),
-            "vram": m.get("avg_vram_percent", 0.0)
+            "vram": m.get("avg_vram_percent", 0.0),
+            "power": m.get("avg_power_w", 0.0)
         })
 
     stats.sort(key=lambda x: x["cid"])
     max_time = 0.0
-    
+
     print(f"\n--- ROUND {current_fit_round} FIT RESULTS ---")
-    print(f"ID | Time(s) | Epochs | CPU% | RAM% | GPU% | VRAM%")
-    
+    print(f"ID | Time(s) | Epochs | CPU% | RAM% | GPU% | VRAM% | Power(W)")
+
     with open(csv_hw_filename, mode='a', newline='') as f:
         writer = csv.writer(f)
         for s in stats:
-            print(f" {s['cid']} |  {s['time']:.2f}  |   {s['epochs']}    | {s['cpu']:.1f} | {s['ram']:.1f} | {s['gpu']:.1f} | {s['vram']:.1f}")
+            print(
+                f" {s['cid']} |  {s['time']:.2f}  |   {s['epochs']}    | {s['cpu']:.1f} | {s['ram']:.1f} | {s['gpu']:.1f} | {s['vram']:.1f} | {s['power']:.2f}")
             writer.writerow([
-                current_fit_round, s['cid'], f"{s['time']:.2f}", s['epochs'], 
-                f"{s['cpu']:.1f}", f"{s['ram']:.1f}", f"{s['gpu']:.1f}", f"{s['vram']:.1f}"
+                current_fit_round, s['cid'], f"{s['time']:.2f}", s['epochs'],
+                f"{s['cpu']:.1f}", f"{s['ram']:.1f}", f"{s['gpu']:.1f}", f"{s['vram']:.1f}", f"{s['power']:.2f}"
             ])
             if s['time'] > max_time:
                 max_time = s['time']

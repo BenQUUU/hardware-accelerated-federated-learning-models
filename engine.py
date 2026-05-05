@@ -65,19 +65,13 @@ def test(net, testloader, device):
         for images, labels in testloader:
             images = images.to(device)
             orig_feat, rec_feat = net(images)
-            
-            # Mapowanie błędów w przestrzeni [Batch, 96, 16, 16]
+
             loss_map = F.mse_loss(rec_feat, orig_feat, reduction='none')
-            
-            # Uśrednienie błędów dla każdego z 256 sektorów przestrzennych
+
             loss_per_spatial_cell = loss_map.mean(dim=1)
-            
-            # Spłaszczenie do [Batch, 256]
+
             loss_flat = loss_per_spatial_cell.view(loss_per_spatial_cell.size(0), -1)
-            
-            # Detekcja anomalii: Wyciągamy sektor z najwyższym błędem.
-            # Rysa występuje lokalnie. Jeśli maksimum błędu na danym obszarze przekracza normę,
-            # to oznacza, że nakrętka jest zepsuta.
+
             loss_per_image = loss_flat.max(dim=1)[0]
             
             all_losses.extend(loss_per_image.cpu().numpy())

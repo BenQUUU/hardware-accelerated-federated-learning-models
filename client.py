@@ -19,17 +19,17 @@ parser.add_argument("--device", type=str, default="cuda", help="Device (cpu/cuda
 parser.add_argument("--mode", type=str, choices=["epoch", "time", "robust"], default="time", help="Learning mode")
 parser.add_argument("--hw_profile", type=str, choices=["cpu", "cuda", "jetson"], default="cpu", help="Hardware profiler type")
 parser.add_argument("--epochs", type=int, default=5, help="Number of epochs for the mode 'epoch'")
+parser.add_argument("--extractor", type=str, choices=["mobilenet", "shufflenet", "squeezenet"], default="mobilenet", help="Selecting an extractor model")
 args = parser.parse_args()
 
 engine.set_seed()
 DEVICE = torch.device(args.device if torch.cuda.is_available() and args.device == 'cuda' else "cpu")
 print(f"Client {args.cid} starting on device: {DEVICE} in {args.mode.upper()} mode")
 
-net = model.Autoencoder().to(DEVICE)
+net = model.Autoencoder(extractor_name=args.extractor).to(DEVICE)
 trainloader = dataset.load_partitioned_data(args.cid, args.total_clients, args.data_path)
 
 def set_parameters(net, parameters):
-    # Odbieramy od serwera i wczytujemy TYLKO wagi, które nie należą do kodera
     trainable_keys = [k for k in net.state_dict().keys() if "encoder" not in k]
     params_dict = zip(trainable_keys, parameters)
     state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
@@ -40,7 +40,6 @@ class FlowerClient(fl.client.NumPyClient):
         self.data_iterator = iter(trainloader)
 
     def get_parameters(self, config):
-        # Do serwera odsyłamy TYLKO trenowalne wagi (oszczędność przepustowości)
         return [val.cpu().numpy() for name, val in net.state_dict().items() if "encoder" not in name]
 
     def fit(self, parameters, config):

@@ -1,5 +1,6 @@
 import os
 import glob
+import random
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from PIL import Image
@@ -19,6 +20,7 @@ class MVTecDataset(Dataset):
         image = Image.open(img_path).convert("RGB")
         if self.transform:
             image = self.transform(image)
+
         return image, image
 
 class MVTecTestDataset(Dataset):
@@ -62,6 +64,8 @@ def load_partitioned_data(cid, total_clients, data_path, batch_size=8):
     if total_files == 0:
         raise ValueError(f"Nie znaleziono plików w {data_path}. Sprawdź ścieżkę!")
 
+    random.Random(42).shuffle(files)
+
     partition_size = total_files // total_clients
     start_idx = cid * partition_size
 
@@ -73,14 +77,28 @@ def load_partitioned_data(cid, total_clients, data_path, batch_size=8):
     my_files = files[start_idx:end_idx]
     print(f"[Client {cid}] Loading {len(my_files)} images (Index: {start_idx}-{end_idx})")
 
-    client_transform = transforms.Compose([
+    # BAZOWE TRANSFORMACJE (wspólne dla wszystkich)
+    base_transforms = [
         transforms.Resize((IMG_SIZE, IMG_SIZE)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         transforms.ToTensor(),
-    ])
+    ]
 
-    print(f"[Client {cid}] IID Profile: Równe i czyste dane (Brak ColorJitter)")
+    # ZMIENNA BADAWCZA: Logika Covariate Shift
+    if cid == 0:
+        client_transform = transforms.Compose(base_transforms)
+        print(f"[Client {cid}] Profil REFERENCYJNY: Czyste dane (Jetson 1)")
+    elif cid == 1:
+        # Ten Jetson udaje zepsutą kamerę
+        client_transform = transforms.Compose([
+            transforms.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.4, hue=0.1),
+            *base_transforms
+        ])
+        print(f"[Client {cid}] Profil ANOMALII: Zdegradowany sensor ColorJitter (Jetson 2)")
+    else:
+        client_transform = transforms.Compose(base_transforms)
+        print(f"[Client {cid}] Profil STANDARDOWY")
 
     dataset = MVTecDataset(my_files, transform=client_transform)
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)
