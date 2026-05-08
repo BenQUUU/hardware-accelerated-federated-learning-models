@@ -44,15 +44,20 @@ def get_on_fit_config_fn(timeout_seconds: float):
         return {"timeout": timeout_seconds}
     return fit_config
 
+
 def get_evaluate_fn(data_path):
     testloader = dataset.load_test_data(data_path)
 
     def evaluate(server_round: int, parameters: fl.common.NDArrays, config: dict):
         net = model.Autoencoder(extractor_name=args.extractor).to(DEVICE)
-        
-        # Modyfikacja wczytywania częściowych wag
-        trainable_keys = [k for k in net.state_dict().keys() if "encoder" not in k]
-        params_dict = zip(trainable_keys, parameters)
+
+        valid_keys = [k for k in net.state_dict().keys() if "num_batches_tracked" not in k]
+
+        if len(valid_keys) != len(parameters):
+            print(
+                f"[OSTRZEŻENIE] Niezgodność liczby warstw! Oczekiwano: {len(valid_keys)}, Otrzymano: {len(parameters)}")
+
+        params_dict = zip(valid_keys, parameters)
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
         net.load_state_dict(state_dict, strict=False)
 
@@ -67,6 +72,7 @@ def get_evaluate_fn(data_path):
             writer.writerow([server_round, f"{auroc:.4f}", f"{current_max_time:.2f}"])
 
         return avg_mse, {"auroc": auroc}
+
     return evaluate
 
 

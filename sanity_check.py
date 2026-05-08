@@ -14,7 +14,6 @@ def main():
     parser.add_argument("--batch_size", type=int, default=16, help="Rozmiar paczki danych")
     args = parser.parse_args()
 
-    # Zapewnienie powtarzalności wyników
     engine.set_seed()
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -28,30 +27,28 @@ def main():
         return
 
     print(f"Załadowano {len(files)} obrazów treningowych.")
-    
-    # KLUCZOWA ZMIANA: Augmentacja danych identyczna jak w środowisku FL (dataset.py)
+
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
         transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(), # Zastępuje rotację
+        transforms.RandomVerticalFlip(),
         transforms.ToTensor(),
     ])
     
     train_dataset = dataset.MVTecDataset(files, transform=transform)
     trainloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
 
-    # Ładowanie danych testowych (bez augmentacji, tylko standaryzacja)
     testloader = dataset.load_test_data(args.data_path, batch_size=args.batch_size)
     print(f"Załadowano obrazy testowe (dobre i z defektami).")
 
-    net = model.Autoencoder().to(device)
+    net = model.Autoencoder(extractor_name="shufflenet").to(device)
 
     print("\nRozpoczynam trening modelu...")
     engine.train(net, trainloader, epochs=args.epochs, device=device)
     print("Trening zakończony.")
 
     print("\nPrzeprowadzam ewaluację na zbiorze testowym...")
-    # Aktualizacja zmiennej (to już nie jest avg_mse)
+
     auroc, avg_loss = engine.test(net, testloader, device=device)
     
     print("\n=== WYNIKI SANITY CHECK ===")
@@ -59,7 +56,6 @@ def main():
     print(f"Wskaźnik AUROC:                  {auroc:.4f}")
     print("===========================\n")
 
-    # Zaktualizowane progi oczekiwań
     if auroc < 0.60:
         print("[WERDYKT] Model w zasadzie zgaduje losowo. Architektura nadal zawodzi.")
     elif auroc < 0.82:

@@ -30,17 +30,20 @@ net = model.Autoencoder(extractor_name=args.extractor).to(DEVICE)
 trainloader = dataset.load_partitioned_data(args.cid, args.total_clients, args.data_path)
 
 def set_parameters(net, parameters):
-    trainable_keys = [k for k in net.state_dict().keys() if "encoder" not in k]
-    params_dict = zip(trainable_keys, parameters)
+    valid_keys = [k for k in net.state_dict().keys() if "num_batches_tracked" not in k]
+    params_dict = zip(valid_keys, parameters)
     state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
-    net.load_state_dict(state_dict, strict=False) # strict=False pozwala na to pominięcie
+    net.load_state_dict(state_dict, strict=False)
+
+def get_parameters(net):
+    return [val.cpu().numpy() for name, val in net.state_dict().items() if "num_batches_tracked" not in name]
 
 class FlowerClient(fl.client.NumPyClient):
     def __init__(self):
         self.data_iterator = iter(trainloader)
 
     def get_parameters(self, config):
-        return [val.cpu().numpy() for name, val in net.state_dict().items() if "encoder" not in name]
+        return get_parameters(net)
 
     def fit(self, parameters, config):
         if args.mode == "robust":

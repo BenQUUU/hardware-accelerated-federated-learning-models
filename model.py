@@ -2,27 +2,29 @@ import torch
 import torch.nn as nn
 from torchvision import models
 
-
 class Autoencoder(nn.Module):
     def __init__(self, extractor_name="mobilenet"):
         super(Autoencoder, self).__init__()
 
         if extractor_name == "mobilenet":
             net = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.DEFAULT)
-            self.encoder = net.features
-            out_channels = 1280
 
-        elif extractor_name == "shufflenet":
-            net = models.shufflenet_v2_x1_0(weights=models.ShuffleNet_V2_X1_0_Weights.DEFAULT)
-            self.encoder = nn.Sequential(
-                net.conv1, net.maxpool, net.stage2, net.stage3, net.stage4, net.conv5
-            )
-            out_channels = 1024
+            self.encoder = net.features[:14]
+            out_channels = 96
 
         elif extractor_name == "squeezenet":
             net = models.squeezenet1_1(weights=models.SqueezeNet1_1_Weights.DEFAULT)
-            self.encoder = net.features
-            out_channels = 512
+
+            self.encoder = net.features[:8]
+            out_channels = 256
+
+        elif extractor_name == "shufflenet":
+            net = models.shufflenet_v2_x1_0(weights=models.ShuffleNet_V2_X1_0_Weights.DEFAULT)
+
+            self.encoder = nn.Sequential(
+                net.conv1, net.maxpool, net.stage2
+            )
+            out_channels = 116
 
         else:
             raise ValueError(f"Nieznany model: {extractor_name}")
@@ -30,6 +32,7 @@ class Autoencoder(nn.Module):
         for param in self.encoder.parameters():
             param.requires_grad = False
 
+        # 2. Twój autorski autoenkoder (Wąskie gardło kompresujące do 4 kanałów!)
         self.bottleneck = nn.Sequential(
             nn.Conv2d(out_channels, 16, kernel_size=3, padding=1),
             nn.BatchNorm2d(16),
