@@ -47,12 +47,12 @@ class FlowerClient(fl.client.NumPyClient):
 
     def fit(self, parameters, config):
         if args.mode == "robust":
-            if args.cid == 1 and random.random() < 0.20:
+            if args.cid == 0 and random.random() < 0.20:
                 print(f"[Client {args.cid}] SIMULATION: Network Disconnect! Pomijam rundę.")
                 time.sleep(2)
                 return parameters, 0, {"train_time": 0.0, "cid": args.cid, "epochs_done": 0, "avg_cpu_percent": 0.0,
                                        "avg_ram_percent": 0.0, "avg_gpu_percent": 0.0, "avg_vram_percent": 0.0}
-            elif args.cid == 2 and random.random() < 0.40:
+            elif args.cid == 1 and random.random() < 0.30:
                 print(f"[Client {args.cid}] SIMULATION: Device BUSY. Pomijam rundę.")
                 time.sleep(2)
                 return parameters, 0, {"train_time": 0.0, "cid": args.cid, "epochs_done": 0, "avg_cpu_percent": 100.0,
