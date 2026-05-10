@@ -12,6 +12,19 @@ import model
 import dataset
 import engine
 
+
+class RobustFedAvg(fl.server.strategy.FedAvg):
+    def aggregate_fit(self, server_round: int, results, failures):
+        valid_results = [(client, fit_res) for client, fit_res in results if fit_res.num_examples > 0]
+
+        if not valid_results:
+            print(f"\n[SERVER] KRYTYCZNA AWARIA KLASTRA W RUNDZIE {server_round}. Wszyscy klienci odrzucili zadanie!")
+            print("[SERVER] Serwer bezpiecznie pomija aktualizację globalnego modelu i czeka na kolejną rundę.\n")
+
+            return None, {}
+
+        return super().aggregate_fit(server_round, valid_results, failures)
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_path", type=str, required=True, help="Path to mvtec/metal_nut folder")
 parser.add_argument("--min_clients", type=int, default=2, help="Minimum clients required to proceed")
@@ -117,14 +130,12 @@ def fit_metrics_aggregation_fn(fit_metrics: List[Tuple[int, Metrics]]) -> Metric
     return {"max_time": max_time}
 
 if __name__ == "__main__":
-    strategy = fl.server.strategy.FedAvg(
+    strategy = RobustFedAvg(
         evaluate_fn=get_evaluate_fn(args.data_path),
         fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
         on_fit_config_fn=get_on_fit_config_fn(timeout_seconds=args.timeout),
         min_fit_clients=args.min_clients,
-
         min_available_clients=args.min_clients,
-
         fraction_evaluate=0.0,
     )
 
