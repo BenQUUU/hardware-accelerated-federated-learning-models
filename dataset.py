@@ -85,20 +85,7 @@ def load_partitioned_data(cid, total_clients, data_path, batch_size=8):
         transforms.ToTensor(),
     ]
 
-    # ZMIENNA BADAWCZA: Logika Covariate Shift
-    if cid == 0:
-        client_transform = transforms.Compose(base_transforms)
-        print(f"[Client {cid}] Profil REFERENCYJNY: Czyste dane (Jetson 1)")
-    elif cid == 1:
-        # Ten Jetson udaje zepsutą kamerę
-        client_transform = transforms.Compose([
-            transforms.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.4, hue=0.1),
-            *base_transforms
-        ])
-        print(f"[Client {cid}] Profil ANOMALII: Zdegradowany sensor ColorJitter (Jetson 2)")
-    else:
-        client_transform = transforms.Compose(base_transforms)
-        print(f"[Client {cid}] Profil STANDARDOWY")
+    client_transform = transforms.Compose(base_transforms)
 
     dataset = MVTecDataset(my_files, transform=client_transform)
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)
