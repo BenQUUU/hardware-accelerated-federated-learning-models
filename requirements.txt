@@ -7,3 +7,5 @@ matplotlib
 scikit-learn
 psutil
 nvidia-ml-py
+torch
+torchvision
