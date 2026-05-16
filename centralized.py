@@ -71,7 +71,7 @@ def load_partitioned_data(cid, total_clients, data_path, batch_size=8):
     
     total_files = len(files)
     if total_files == 0:
-        raise ValueError(f"Nie znaleziono plików w {data_path}. Sprawdź ścieżkę!")
+        raise ValueError(f"No files found in {data_path}. Check the path!")
 
     partition_size = total_files // total_clients
     start_idx = cid * partition_size

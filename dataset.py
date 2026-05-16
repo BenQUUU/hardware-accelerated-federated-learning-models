@@ -62,7 +62,7 @@ def load_partitioned_data(cid, total_clients, data_path, batch_size=8):
     files = get_files(data_path, split="train")
     total_files = len(files)
     if total_files == 0:
-        raise ValueError(f"Nie znaleziono plików w {data_path}. Sprawdź ścieżkę!")
+        raise ValueError(f"No files found in {data_path}. Check the path!")
 
     random.Random(42).shuffle(files)
 
@@ -77,7 +77,7 @@ def load_partitioned_data(cid, total_clients, data_path, batch_size=8):
     my_files = files[start_idx:end_idx]
     print(f"[Client {cid}] Loading {len(my_files)} images (Index: {start_idx}-{end_idx})")
 
-    # BAZOWE TRANSFORMACJE (wspólne dla wszystkich)
+    # BASE TRANSFORMATIONS (common for all)
     base_transforms = [
         transforms.Resize((IMG_SIZE, IMG_SIZE)),
         transforms.RandomHorizontalFlip(),

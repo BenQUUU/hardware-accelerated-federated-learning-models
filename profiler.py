@@ -24,7 +24,7 @@ class HardwareProfiler:
         self.running = False
         self.thread = None
 
-        # Inicjalizacja list z metrykami
+        # Initialize metric lists
         self.cpu_usage = []
         self.ram_usage = []
         self.gpu_usage = []
@@ -37,7 +37,7 @@ class HardwareProfiler:
     def _sample_metrics(self):
         if self.device_type in ['cpu', 'cuda']:
             while self.running:
-                # 1. Pobieramy obciążenie CPU raz, by użyć go ew. do estymacji
+                # 1. Get CPU load once to optionally use for estimation
                 current_cpu = psutil.cpu_percent(interval=None)
                 self.cpu_usage.append(current_cpu)
                 self.ram_usage.append(psutil.virtual_memory().percent)
@@ -48,7 +48,7 @@ class HardwareProfiler:
                     self.vram_usage.append((info.used / info.total) * 100)
                     self.gpu_usage.append(rates.gpu)
 
-                    # Pobór mocy dla CUDA (NVML zwraca miliwaty)
+                    # Power consumption for CUDA (NVML returns milliwatts)
                     try:
                         power_w = pynvml.nvmlDeviceGetPowerUsage(self.handle) / 1000.0
                         self.power_usage.append(power_w)
@@ -58,7 +58,7 @@ class HardwareProfiler:
                     self.vram_usage.append(0.0)
                     self.gpu_usage.append(0.0)
 
-                    # Estymacja mocy dla CPU / Maliny (Zakładamy 3W idle, 9W max)
+                    # Power estimation for CPU / Raspberry (Assuming 3W idle, 9W max)
                     estimated_power_w = 3.0 + (9.0 - 3.0) * (current_cpu / 100.0)
                     self.power_usage.append(estimated_power_w)
 
@@ -66,7 +66,7 @@ class HardwareProfiler:
 
         elif self.device_type == 'jetson':
             if not JTOP_AVAILABLE:
-                print("[Błąd Profilera] Biblioteka jtop nie jest zainstalowana na tym urządzeniu.")
+                print("[Profiler Error] The jtop library is not installed on this device.")
                 return
             with jtop() as jetson:
                 while self.running and jetson.ok():
@@ -79,7 +79,7 @@ class HardwareProfiler:
                     stats = jetson.stats
                     self.gpu_usage.append(stats.get('GPU', 0))
 
-                    # Pomiary mocy z Jetsona (INA3221) z zabezpieczeniem struktury
+                    # Power measurements from Jetson (INA3221) with structure protection
                     try:
                         power_w = jetson.power['tot']['power'] / 1000.0
                         self.power_usage.append(power_w)

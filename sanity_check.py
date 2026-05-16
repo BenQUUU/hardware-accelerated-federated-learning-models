@@ -8,25 +8,25 @@ import dataset
 import engine
 
 def main():
-    parser = argparse.ArgumentParser(description="Sanity Check dla modelu Autoenkodera")
-    parser.add_argument("--data_path", type=str, required=True, help="Ścieżka do mvtec/metal_nut")
-    parser.add_argument("--epochs", type=int, default=100, help="Liczba epok treningowych (zalecane min. 50)")
-    parser.add_argument("--batch_size", type=int, default=16, help="Rozmiar paczki danych")
+    parser = argparse.ArgumentParser(description="Sanity Check for Autoencoder model")
+    parser.add_argument("--data_path", type=str, required=True, help="Path to mvtec/metal_nut")
+    parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs (recommended min. 50)")
+    parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
     args = parser.parse_args()
 
     engine.set_seed()
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"=== Rozpoczynam Sanity Check ===")
-    print(f"Urządzenie docelowe: {device}")
-    print(f"Liczba epok: {args.epochs}")
+    print(f"=== Starting Sanity Check ===")
+    print(f"Target device: {device}")
+    print(f"Number of epochs: {args.epochs}")
 
     files = dataset.get_files(args.data_path, split="train")
     if not files:
-        print("BŁĄD: Nie znaleziono plików treningowych. Sprawdź ścieżkę --data_path.")
+        print("ERROR: No training files found. Check the --data_path.")
         return
 
-    print(f"Załadowano {len(files)} obrazów treningowych.")
+    print(f"Loaded {len(files)} training images.")
 
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
@@ -39,29 +39,29 @@ def main():
     trainloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
 
     testloader = dataset.load_test_data(args.data_path, batch_size=args.batch_size)
-    print(f"Załadowano obrazy testowe (dobre i z defektami).")
+    print(f"Loaded test images (good and defective).")
 
     net = model.Autoencoder(extractor_name="shufflenet").to(device)
 
-    print("\nRozpoczynam trening modelu...")
+    print("\nStarting model training...")
     engine.train(net, trainloader, epochs=args.epochs, device=device)
-    print("Trening zakończony.")
+    print("Training finished.")
 
-    print("\nPrzeprowadzam ewaluację na zbiorze testowym...")
+    print("\nEvaluating on test dataset...")
 
     auroc, avg_loss = engine.test(net, testloader, device=device)
     
-    print("\n=== WYNIKI SANITY CHECK ===")
-    print(f"Średni błąd ewaluacji (Top-K):   {avg_loss:.5f}")
-    print(f"Wskaźnik AUROC:                  {auroc:.4f}")
+    print("\n=== SANITY CHECK RESULTS ===")
+    print(f"Average evaluation loss (Top-K): {avg_loss:.5f}")
+    print(f"AUROC score:                     {auroc:.4f}")
     print("===========================\n")
 
     if auroc < 0.60:
-        print("[WERDYKT] Model w zasadzie zgaduje losowo. Architektura nadal zawodzi.")
+        print("[VERDICT] Model is basically guessing randomly. Architecture still failing.")
     elif auroc < 0.82:
-        print("[WERDYKT] Model coś zauważa, ale wynik jest poniżej oczekiwanego progu (0.82+).")
+        print("[VERDICT] Model notices something, but score is below expected threshold (0.82+).")
     else:
-        print("[WERDYKT] Wynik akceptowalny! Model potrafi odróżnić anomalie. Możesz przechodzić do FL.")
+        print("[VERDICT] Acceptable result! Model can distinguish anomalies. You can proceed to FL.")
 
 if __name__ == "__main__":
     main()

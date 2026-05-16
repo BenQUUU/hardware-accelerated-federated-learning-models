@@ -18,8 +18,8 @@ class RobustFedAvg(fl.server.strategy.FedAvg):
         valid_results = [(client, fit_res) for client, fit_res in results if fit_res.num_examples > 0]
 
         if not valid_results:
-            print(f"\n[SERVER] KRYTYCZNA AWARIA KLASTRA W RUNDZIE {server_round}. Wszyscy klienci odrzucili zadanie!")
-            print("[SERVER] Serwer bezpiecznie pomija aktualizację globalnego modelu i czeka na kolejną rundę.\n")
+            print(f"\n[SERVER] CRITICAL CLUSTER FAILURE IN ROUND {server_round}. All clients rejected the task!")
+            print("[SERVER] Server safely skips global model update and waits for the next round.\n")
 
             return None, {}
 
@@ -68,7 +68,7 @@ def get_evaluate_fn(data_path):
 
         if len(valid_keys) != len(parameters):
             print(
-                f"[OSTRZEŻENIE] Niezgodność liczby warstw! Oczekiwano: {len(valid_keys)}, Otrzymano: {len(parameters)}")
+                f"[WARNING] Layer mismatch! Expected: {len(valid_keys)}, Got: {len(parameters)}")
 
         params_dict = zip(valid_keys, parameters)
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
@@ -152,11 +152,11 @@ if __name__ == "__main__":
 
         plt.figure(figsize=(10, 5))
         plt.plot(rounds, scores, marker='o', linestyle='-', color='r', label='AUROC (Anomaly Detection)')
-        plt.title(f'Krzywa ewaluacji - {args.exp_name}')
-        plt.xlabel('Runda komunikacyjna (Server Round)')
-        plt.ylabel('Wskaźnik AUROC')
+        plt.title(f'Evaluation Curve - {args.exp_name}')
+        plt.xlabel('Communication Round (Server Round)')
+        plt.ylabel('AUROC Score')
         plt.grid(True)
         plt.legend()
         plot_filename = f'plot_auroc_{args.exp_name}.png'
         plt.savefig(plot_filename)
-        print(f"\n=> Wygenerowano wykres: {plot_filename}")
+        print(f"\n=> Generated plot: {plot_filename}")

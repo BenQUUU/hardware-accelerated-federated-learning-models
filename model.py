@@ -27,12 +27,11 @@ class Autoencoder(nn.Module):
             out_channels = 116
 
         else:
-            raise ValueError(f"Nieznany model: {extractor_name}")
+            raise ValueError(f"Unknown model: {extractor_name}")
 
         for param in self.encoder.parameters():
             param.requires_grad = False
 
-        # 2. Twój autorski autoenkoder (Wąskie gardło kompresujące do 4 kanałów!)
         self.bottleneck = nn.Sequential(
             nn.Conv2d(out_channels, 16, kernel_size=3, padding=1),
             nn.BatchNorm2d(16),
