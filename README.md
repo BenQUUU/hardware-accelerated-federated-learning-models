@@ -61,7 +61,4 @@ Extensive hardware profiling demonstrates that the proposed time-aware strategy:
 * Successfully mitigates the straggler effect caused by Raspberry Pi 5.
 * Achieves competitive **AUROC** scores despite severe data imbalance and hardware asymmetry.
 
-## License
-This project is licensed under the GNU GPL v3 License - see the [LICENSE](LICENSE) file for details.
-
 
