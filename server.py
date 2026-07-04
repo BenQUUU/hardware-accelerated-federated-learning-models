@@ -186,8 +186,28 @@ if __name__ == "__main__":
         rounds = [x[0] for x in history_auroc]
         scores = [x[1] for x in history_auroc]
 
+        # Najlepszy AUROC (early-stopping) i wynik koncowy -- kluczowe dla datasetow,
+        # ktore przeuczaja sie (np. VisA/pcb1: szczyt w 1. rundzie, potem spadek).
+        best_round, best_auroc = max(history_auroc, key=lambda x: x[1])
+        final_round, final_auroc = history_auroc[-1]
+        print("\n==================== SUMMARY ====================")
+        print(f"BEST  AUROC: {best_auroc:.4f} @ round {best_round}")
+        print(f"FINAL AUROC: {final_auroc:.4f} @ round {final_round}")
+        print("================================================")
+
+        summary_filename = f"summary_{args.exp_name}.csv"
+        with open(summary_filename, mode='w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(["Exp_Name", "Best_AUROC", "Best_Round", "Final_AUROC", "Final_Round"])
+            writer.writerow([args.exp_name, f"{best_auroc:.4f}", best_round, f"{final_auroc:.4f}", final_round])
+        print(f"=> Generated summary: {summary_filename}")
+
         plt.figure(figsize=(10, 5))
         plt.plot(rounds, scores, marker='o', linestyle='-', color='r', label='AUROC (Anomaly Detection)')
+        plt.scatter([best_round], [best_auroc], color='green', zorder=5, s=90,
+                    label=f'Best: {best_auroc:.4f} @ r{best_round}')
+        plt.annotate(f'{best_auroc:.4f}', (best_round, best_auroc),
+                     textcoords="offset points", xytext=(0, 10), ha='center', color='green')
         plt.title(f'Evaluation Curve - {args.exp_name}')
         plt.xlabel('Communication Round (Server Round)')
         plt.ylabel('AUROC Score')
@@ -195,4 +215,4 @@ if __name__ == "__main__":
         plt.legend()
         plot_filename = f'plot_auroc_{args.exp_name}.png'
         plt.savefig(plot_filename)
-        print(f"\n=> Generated plot: {plot_filename}")
+        print(f"=> Generated plot: {plot_filename}")
