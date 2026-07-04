@@ -51,6 +51,14 @@ class Autoencoder(nn.Module):
         self.register_buffer('mean', torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
         self.register_buffer('std', torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
 
+    def train(self, mode=True):
+        # Enkoder zawsze w trybie eval: wagi są zamrożone (requires_grad=False),
+        # a to gwarantuje, że statystyki BatchNorm (running_mean/var) NIE dryfują
+        # podczas treningu i nie są zaburzane przez covariate shift w FedAvg.
+        super().train(mode)
+        self.encoder.eval()
+        return self
+
     def forward(self, x):
         x_norm = (x - self.mean) / self.std
         with torch.no_grad():

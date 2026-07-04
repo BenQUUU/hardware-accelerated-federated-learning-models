@@ -14,12 +14,20 @@ parser = argparse.ArgumentParser(description="Flower Client")
 parser.add_argument("--cid", type=int, required=True, help="Client ID (0-indexed)")
 parser.add_argument("--total_clients", type=int, default=2, help="Total clients in swarm")
 parser.add_argument("--server_ip", type=str, default="127.0.0.1", help="Server IP address")
-parser.add_argument("--data_path", type=str, required=True, help="Path to mvtec/metal_nut folder")
+parser.add_argument("--data_path", type=str, required=True, help="Path to main data folder")
+parser.add_argument("--dataset", type=str, choices=["mvtec", "visa", "realiad"], required=True, help="Dataset name")
+parser.add_argument("--class_name", type=str, required=True, help="Class name (e.g., metal_nut, pcb1)")
+parser.add_argument("--apply_shift", action="store_true", help="Activate Covariate Shift for client 1")
 parser.add_argument("--device", type=str, default="cuda", help="Device (cpu/cuda)")
 parser.add_argument("--mode", type=str, choices=["epoch", "time", "robust"], default="time", help="Learning mode")
-parser.add_argument("--hw_profile", type=str, choices=["cpu", "cuda", "jetson"], default="cpu", help="Hardware profiler type")
-parser.add_argument("--epochs", type=int, default=5, help="Number of epochs for the mode 'epoch'")
+parser.add_argument("--hw_profile", type=str, choices=["cpu", "cuda", "jetson", "rpi"], default="cpu", help="Hardware profiler type")
+parser.add_argument("--epochs", type=int, default=2, help="Number of local epochs per round for the mode 'epoch'")
 parser.add_argument("--extractor", type=str, choices=["mobilenet", "shufflenet", "squeezenet"], default="mobilenet", help="Selecting an extractor model")
+parser.add_argument("--num_workers", type=int, default=0, help="DataLoader worker processes. UWAGA: >0 dziala na Linux/Jetson (fork); na Windows (spawn) trzymaj 0.")
+parser.add_argument("--weighting", type=str, choices=["steps", "dataset"], default="steps",
+                    help="Waga w FedAvg dla trybu 'time': 'steps'=liczba przetworzonych probek (nagradza szybszy sprzet), 'dataset'=rozmiar zbioru (klasyczny FedAvg, odklejony od predkosci HW).")
+parser.add_argument("--partition_mode", type=str, choices=["split", "whole"], default="split",
+                    help="'split'=jedna klasa dzielona na klientow (dane ~IID); 'whole'=kazdy klient bierze CALA swoja klase (rozne klasy per klient => Non-IID danych).")
 args = parser.parse_args()
 
 engine.set_seed()
@@ -27,7 +35,10 @@ DEVICE = torch.device(args.device if torch.cuda.is_available() and args.device =
 print(f"Client {args.cid} starting on device: {DEVICE} in {args.mode.upper()} mode")
 
 net = model.Autoencoder(extractor_name=args.extractor).to(DEVICE)
-trainloader = dataset.load_partitioned_data(args.cid, args.total_clients, args.data_path)
+trainloader = dataset.load_partitioned_data(
+    args.cid, args.total_clients, args.data_path, args.dataset, args.class_name, args.apply_shift,
+    num_workers=args.num_workers, pin_memory=(DEVICE.type == "cuda"), partition_mode=args.partition_mode
+)
 
 def set_parameters(net, parameters):
     valid_keys = [k for k in net.state_dict().keys() if "num_batches_tracked" not in k]
@@ -84,7 +95,10 @@ class FlowerClient(fl.client.NumPyClient):
         print(f"[Client {args.cid}] Finished. Epochs: {epochs_done}. Time: {duration:.2f}s")
         print(f"[Client {args.cid}] HW Metrics: CPU: {hw_metrics['avg_cpu_percent']:.1f}% | GPU: {hw_metrics['avg_gpu_percent']:.1f}%")
 
-        if args.mode == "time":
+        # Waga w agregacji FedAvg. W trybie 'time' szybszy sprzet przetwarza wiecej
+        # probek (num_examples z powtorzeniami) -- 'steps' nagradza go wieksza waga,
+        # 'dataset' odkleja wage od predkosci HW (klasyczny FedAvg po rozmiarze zbioru).
+        if args.mode == "time" and args.weighting == "steps":
             actual_dataset_size = num_examples
         else:
             actual_dataset_size = len(trainloader.dataset)

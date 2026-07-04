@@ -43,8 +43,12 @@ def train_by_time(net, data_iterator, trainloader, timeout, device):
             images, _ = next(data_iterator)
         except StopIteration:
             data_iterator = iter(trainloader)
-            images, _ = next(data_iterator)
             epochs_done += 1
+            try:
+                images, _ = next(data_iterator)
+            except StopIteration:
+                # Pusty loader — nie ma czego trenowac, przerywamy petle bezpiecznie.
+                break
 
         images = images.to(device)
         optimizer.zero_grad()
