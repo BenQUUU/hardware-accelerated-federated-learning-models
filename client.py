@@ -62,12 +62,12 @@ class FlowerClient(fl.client.NumPyClient):
                 print(f"[Client {args.cid}] SIMULATION: Network Disconnect! Skipping round.")
                 time.sleep(2)
                 return parameters, 0, {"train_time": 0.0, "cid": args.cid, "epochs_done": 0, "avg_cpu_percent": 0.0,
-                                       "avg_ram_percent": 0.0, "avg_gpu_percent": 0.0, "avg_vram_percent": 0.0}
+                                       "avg_ram_percent": 0.0, "avg_gpu_percent": 0.0, "avg_vram_percent": 0.0, "avg_power_w": 0.0}
             elif args.cid == 1 and random.random() < 0.30:
                 print(f"[Client {args.cid}] SIMULATION: Device BUSY. Skipping round.")
                 time.sleep(2)
                 return parameters, 0, {"train_time": 0.0, "cid": args.cid, "epochs_done": 0, "avg_cpu_percent": 100.0,
-                                       "avg_ram_percent": 0.0, "avg_gpu_percent": 0.0, "avg_vram_percent": 0.0}
+                                       "avg_ram_percent": 0.0, "avg_gpu_percent": 0.0, "avg_vram_percent": 0.0, "avg_power_w": 0.0}
 
         set_parameters(self.net, parameters)
         start_time = time.time()
@@ -78,7 +78,9 @@ class FlowerClient(fl.client.NumPyClient):
         hw_profiler.start()
 
         try:
-            if args.mode == "epoch":
+            # Tryb 'robust' trenuje po epokach (jak 'epoch'), aby scenariusz 5 byl
+            # wprost porownywalny ze scenariuszem 3 -- jedyna roznica to dropouty.
+            if args.mode in ("epoch", "robust"):
                 print(f"[Client {args.cid}] Starting EPOCH training ({args.epochs} epochs)...")
                 engine.train(self.net, self.trainloader, epochs=args.epochs, device=self.device)
                 epochs_done = args.epochs
