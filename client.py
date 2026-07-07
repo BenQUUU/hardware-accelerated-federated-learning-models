@@ -27,9 +27,9 @@ def parse_args():
     parser.add_argument("--extractor", type=str, choices=["mobilenet", "shufflenet", "squeezenet"], default="mobilenet", help="Selecting an extractor model")
     parser.add_argument("--num_workers", type=int, default=0, help="DataLoader worker processes. Dziala na Windows/Linux (setup jest pod main()).")
     parser.add_argument("--weighting", type=str, choices=["steps", "dataset"], default="steps",
-                        help="Waga w FedAvg dla trybu 'time': 'steps'=liczba przetworzonych probek (nagradza szybszy sprzet), 'dataset'=rozmiar zbioru (klasyczny FedAvg, odklejony od predkosci HW).")
+                        help="FedAvg weighting for 'time' mode: 'steps' = number of processed samples (rewards faster hardware), 'dataset' = dataset size (classic FedAvg, decoupled from hardware speed).")
     parser.add_argument("--partition_mode", type=str, choices=["split", "whole"], default="split",
-                        help="'split'=jedna klasa dzielona na klientow (dane ~IID); 'whole'=kazdy klient bierze CALA swoja klase (rozne klasy per klient => Non-IID danych).")
+                        help="'split' = one class split across clients (data ~ IID); 'whole' = each client takes the entire class (different classes per client => non-IID data).")
     return parser.parse_args()
 
 

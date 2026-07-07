@@ -19,11 +19,6 @@ try:
 except ImportError:
     JTOP_AVAILABLE = False
 
-# Intel/AMD RAPL: sprzetowy licznik energii CPU x86 -- WYLACZNIE Linux.
-# Na Windows ta sciezka nie istnieje (RAPL_AVAILABLE = False), wiec moc CPU
-# pozostaje swiadomie niezmierzona. Zgodnie z zalozeniem badawczym wezly
-# 'bez akceleracji' zyja na Linuxie (Raspberry Pi 5 / Jetson CPU-only), gdzie
-# moc jest mierzona realnie -- RAPL to tylko opcjonalny bonus dla x86/Linux.
 RAPL_ENERGY_PATH = "/sys/class/powercap/intel-rapl:0/energy_uj"
 RAPL_MAX_PATH = "/sys/class/powercap/intel-rapl:0/max_energy_range_uj"
 RAPL_AVAILABLE = os.path.exists(RAPL_ENERGY_PATH)
@@ -144,8 +139,6 @@ class HardwareProfiler:
                     self.power_usage.append(power_w)
                     prev_energy, prev_ts = energy, now
                 else:
-                    # Windows/x86 bez RAPL => moc CPU swiadomie niezmierzona (0.0),
-                    # zamiast zmyslonej estymacji. Ten wezel nie jest baseline'em energii.
                     self.power_usage.append(0.0)
 
             time.sleep(0.5)

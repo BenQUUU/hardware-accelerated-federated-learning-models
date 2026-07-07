@@ -37,7 +37,6 @@ def main():
         transforms.ToTensor(),
     ])
 
-    # Inicjalizacja nowego, uniwersalnego Datasetu
     train_dataset = dataset.IndustrialAnomalyDataset(
         dataset_name=args.dataset, 
         root_path=args.data_path, 
@@ -60,7 +59,6 @@ def main():
         persistent_workers=True
     )
 
-    # Ładowanie zbioru testowego przez zaktualizowaną funkcję pomocniczą
     testloader = dataset.load_test_data(args.data_path, args.dataset, args.class_name, batch_size=args.batch_size)
     print(f"Loaded test images (good and defective).")
 

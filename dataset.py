@@ -22,7 +22,7 @@ class IndustrialAnomalyDataset(Dataset):
         elif dataset_name == "realiad":
             self._load_realiad(root_path, class_name, is_train)
         else:
-            raise ValueError(f"[ERROR] Nieobsługiwany zbiór danych: {dataset_name}")
+            raise ValueError(f"[ERROR] Unsupported dataset: {dataset_name}")
 
     def _load_mvtec(self, root, cls, is_train):
         cls_dir = os.path.join(root, cls)
@@ -102,8 +102,6 @@ class IndustrialAnomalyDataset(Dataset):
 
 def load_partitioned_data(cid, total_clients, data_path, dataset_name, class_name, apply_shift=False,
                           batch_size=8, num_workers=0, pin_memory=False, partition_mode="split"):
-    # Czysty pipeline bazowy (bez losowych flipow) => spojny z sanity_check.py.
-    # Jedyna celowa perturbacja Non-IID to ColorJitter ponizej (covariate shift).
     base_transforms = [
         transforms.Resize((IMG_SIZE, IMG_SIZE)),
         transforms.ToTensor(),
@@ -120,17 +118,17 @@ def load_partitioned_data(cid, total_clients, data_path, dataset_name, class_nam
             transforms.ToTensor(),
         ])
         full_dataset.transform = shift_transform
-        print(f"[Client {cid}] Profil ANOMALII: Covariate Shift aktywny.")
+        print(f"[Client {cid}] ANOMALY PROFILE: Covariate Shift enabled.")
 
     total_files = len(full_dataset)
     if total_files == 0:
-        raise ValueError(f"Brak plików w {data_path} dla {dataset_name}/{class_name}.")
+        raise ValueError(f"No files found in {data_path} for {dataset_name}/{class_name}.")
 
     if partition_mode == "whole":
         # Non-IID danych: kazdy klient uzywa CALEJ swojej klasy (rozne klasy per klient).
         # Podzialem jest samo przypisanie klasy, wiec nie tniemy zbioru na partycje.
         client_dataset = full_dataset
-        print(f"[Client {cid}] Tryb WHOLE: pełna klasa '{class_name}' ({total_files} obrazów treningowych).")
+        print(f"[Client {cid}] WHOLE mode: using the full class '{class_name}' ({total_files} training images).")
     else:
         # Tryb 'split': jedna klasa dzielona rowno na total_clients (dane ~IID).
         partition_size = total_files // total_clients
@@ -139,9 +137,8 @@ def load_partitioned_data(cid, total_clients, data_path, dataset_name, class_nam
 
         datasets = torch.utils.data.random_split(full_dataset, lengths, generator=torch.Generator().manual_seed(42))
         client_dataset = datasets[cid]
-        print(f"[Client {cid}] Tryb SPLIT: załadowano {len(client_dataset)} obrazów treningowych.")
+        print(f"[Client {cid}] SPLIT mode: loaded {len(client_dataset)} training images.")
 
-    # generator z ustalonym ziarnem => powtarzalna kolejność batchy między uruchomieniami
     loader_generator = torch.Generator().manual_seed(42)
     return DataLoader(
         client_dataset,

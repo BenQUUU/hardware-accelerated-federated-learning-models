@@ -12,14 +12,10 @@ import model
 import dataset
 import engine
 
-
 current_server_round = 0
-
 
 class RobustFedAvg(fl.server.strategy.FedAvg):
     def aggregate_fit(self, server_round: int, results, failures):
-        # Zapamiętujemy realny numer rundy serwera, aby fit_metrics_aggregation_fn
-        # (którego sygnatura nie dostaje server_round) logował go spójnie z ewaluacją.
         global current_server_round
         current_server_round = server_round
 
@@ -36,7 +32,7 @@ class RobustFedAvg(fl.server.strategy.FedAvg):
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_path", type=str, required=True, help="Path to main data folder")
 parser.add_argument("--dataset", type=str, choices=["mvtec", "visa", "realiad"], required=True, help="Dataset name")
-parser.add_argument("--class_name", type=str, required=True, help="Nazwa klasy, lub kilka po przecinku dla Non-IID danych (np. 'metal_nut,pcb1'). Model globalny jest ewaluowany na kazdej z nich.")
+parser.add_argument("--class_name", type=str, required=True, help="Class name, or a comma-separated list for non-IID data (e.g. 'metal_nut,pcb1'). The global model is evaluated on each of them.")
 parser.add_argument("--min_clients", type=int, default=2, help="Minimum clients required to proceed")
 parser.add_argument("--total_clients", type=int, default=2, help="Total expected clients")
 parser.add_argument("--exp_name", type=str, default="baseline", help="Experiment name for CSV/Plots")
@@ -48,7 +44,7 @@ args = parser.parse_args()
 engine.set_seed()
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Lista klas ewaluacyjnych (jedna, lub kilka po przecinku dla Non-IID danych).
+# Lista klas ewaluacyjnych
 CLASS_NAMES = [c.strip() for c in args.class_name.split(",") if c.strip()]
 MULTICLASS = len(CLASS_NAMES) > 1
 
@@ -186,8 +182,6 @@ if __name__ == "__main__":
         rounds = [x[0] for x in history_auroc]
         scores = [x[1] for x in history_auroc]
 
-        # Najlepszy AUROC (early-stopping) i wynik koncowy -- kluczowe dla datasetow,
-        # ktore przeuczaja sie (np. VisA/pcb1: szczyt w 1. rundzie, potem spadek).
         best_round, best_auroc = max(history_auroc, key=lambda x: x[1])
         final_round, final_auroc = history_auroc[-1]
         print("\n==================== SUMMARY ====================")
