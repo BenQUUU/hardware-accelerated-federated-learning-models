@@ -27,10 +27,8 @@ The system is designed and tested on a highly asymmetric star topology cluster. 
 | Tier 2 (Embedded Edge AI) | NVIDIA Jetson Orin Nano (ARM + GPU, Unified Memory) | `jetson` | `jtop` / INA3221 |
 | Tier 3 (IoT / CPU-only) | Raspberry Pi 5 (ARM CPU) | `rpi` | `vcgencmd` PMIC |
 
-> **Note (Blackwell):** the RTX PRO 1000 laptop (`sm_120`) requires a PyTorch build against CUDA 12.8+. Verify `torch.cuda.get_device_capability()` before benchmarking, otherwise runs may silently fall back to CPU.
-
 ## Dataset
-Supports three industrial anomaly-detection benchmarks: [MVTec AD](https://www.mvtec.com/company/research/datasets/mvtec-ad), VisA, and Real-IAD (`--dataset {mvtec,visa,realiad}`). Training uses only nominal (defect-free) images; the test split mixes nominal and defective samples for AUROC scoring.
+Supports three industrial anomaly-detection benchmarks: [MVTec AD](https://www.mvtec.com/company/research/datasets/mvtec-ad), [VisA](https://www.kaggle.com/datasets/ess1004/visa-anomaly-detection/data), and [Real-IAD](https://realiad4ad.github.io/Real-IAD/) (`--dataset {mvtec,visa,realiad}`). Training uses only nominal (defect-free) images; the test split mixes nominal and defective samples for AUROC scoring.
 
 Two partitioning strategies simulate Non-IID industrial production lines:
 * `--partition_mode split` (default): one product class is split evenly across clients (data ~IID; heterogeneity comes from hardware + optional covariate shift).
