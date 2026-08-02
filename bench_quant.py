@@ -24,6 +24,9 @@ import torch
 import torch.nn as nn
 from torchvision import models
 from torchvision.models import quantization as tvq
+from torch.ao.quantization import (
+    QConfig, MinMaxObserver, MovingAverageMinMaxObserver, MovingAveragePerChannelMinMaxObserver,
+)
 
 import dataset as ds
 
@@ -131,7 +134,28 @@ def build_int8_qat(backend):
     return enc
 
 
-def build_int8_ptq(calib_batches, backend):
+def _ptq_qconfig(per_channel):
+    """Konfiguracja kwantyzacji dla qnnpack (ARM wymaga reduce_range=False).
+
+    per_channel=True: osobna skala na kanał wag -- kluczowe dla konwolucji głębokościowych
+    MobileNetu, gdzie zakres dynamiczny per kanał jest szeroki. per_channel=False: jedna
+    skala na cały tensor wag (wariant, który degradował cechy w poprzednim pomiarze).
+    """
+    activation = MovingAverageMinMaxObserver.with_args(
+        qscheme=torch.per_tensor_affine, dtype=torch.quint8, reduce_range=False,
+    )
+    if per_channel:
+        weight = MovingAveragePerChannelMinMaxObserver.with_args(
+            qscheme=torch.per_channel_symmetric, dtype=torch.qint8,
+        )
+    else:
+        weight = MinMaxObserver.with_args(
+            qscheme=torch.per_tensor_symmetric, dtype=torch.qint8,
+        )
+    return QConfig(activation=activation, weight=weight)
+
+
+def build_int8_ptq(calib_batches, per_channel):
     """Statyczna kwantyzacja potreningowa, kalibrowana na lokalnych obrazach poprawnych."""
     qnet = tvq.mobilenet_v2(weights=models.MobileNet_V2_Weights.DEFAULT, quantize=False)
     qnet.eval()
@@ -142,7 +166,7 @@ def build_int8_ptq(calib_batches, backend):
 
     enc = QuantizableEncoder(qnet.features[:CUT])
     enc.eval()
-    enc.qconfig = torch.ao.quantization.get_default_qconfig(backend)
+    enc.qconfig = _ptq_qconfig(per_channel)
     torch.ao.quantization.prepare(enc, inplace=True)
     with torch.no_grad():
         for batch in calib_batches:
@@ -258,7 +282,8 @@ def main():
         except RuntimeError as exc:
             print(f"  [!] INT8-QAT niedostepny: {exc}")
     if args.int8_mode in ("ptq", "both"):
-        variants.append(("INT8-PTQ", build_int8_ptq(batches[: args.calib_batches], backend)))
+        variants.append(("INT8-PT", build_int8_ptq(batches[: args.calib_batches], per_channel=False)))
+        variants.append(("INT8-PC", build_int8_ptq(batches[: args.calib_batches], per_channel=True)))
 
     with torch.no_grad():
         print(f"  ksztalt mapy cech: {tuple(reference(batches[0]).shape)}")
