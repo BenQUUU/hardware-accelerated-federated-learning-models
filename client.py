@@ -40,10 +40,13 @@ def parse_args():
 def set_parameters(net, parameters):
     # Federujemy TYLKO trenowalna glowice (bottleneck + decoder). Zamrozony ekstraktor
     # zostaje lokalny -- dzieki temu wezel moze miec inna precyzje (FP16/INT8) bez rozjazdu.
+    # Aktualizujemy wpisy glowicy w KOPII pelnego state_dict i ladujemy calosc: inaczej
+    # kwantyzowany enkoder INT8 wywala KeyError (jego _load_from_state_dict ignoruje strict=False).
     head_keys = [k for k in net.state_dict().keys() if model.is_head_param(k)]
-    params_dict = zip(head_keys, parameters)
-    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
-    net.load_state_dict(state_dict, strict=False)
+    full_state = net.state_dict()
+    for k, v in zip(head_keys, parameters):
+        full_state[k] = torch.tensor(v)
+    net.load_state_dict(full_state, strict=False)
 
 
 def get_parameters(net):
