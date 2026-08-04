@@ -30,18 +30,33 @@ def parse_args():
                         help="FedAvg weighting for 'time' mode: 'steps' = number of processed samples (rewards faster hardware), 'dataset' = dataset size (classic FedAvg, decoupled from hardware speed).")
     parser.add_argument("--partition_mode", type=str, choices=["split", "whole"], default="split",
                         help="'split' = one class split across clients (data ~ IID); 'whole' = each client takes the entire class (different classes per client => non-IID data).")
+    parser.add_argument("--extractor_precision", type=str, choices=["fp32", "fp16", "int8", "auto"], default="fp32",
+                        help="Precision of the FROZEN feature extractor (the trainable head stays FP32). "
+                             "'auto' = fp32 with acceleration (CUDA), fp16 without. "
+                             "int8 requires CPU (qnnpack) and only the 'mobilenet' extractor.")
     return parser.parse_args()
 
 
 def set_parameters(net, parameters):
-    valid_keys = [k for k in net.state_dict().keys() if "num_batches_tracked" not in k]
-    params_dict = zip(valid_keys, parameters)
+    # Federujemy TYLKO trenowalna glowice (bottleneck + decoder). Zamrozony ekstraktor
+    # zostaje lokalny -- dzieki temu wezel moze miec inna precyzje (FP16/INT8) bez rozjazdu.
+    head_keys = [k for k in net.state_dict().keys() if model.is_head_param(k)]
+    params_dict = zip(head_keys, parameters)
     state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
     net.load_state_dict(state_dict, strict=False)
 
 
 def get_parameters(net):
-    return [val.cpu().numpy() for name, val in net.state_dict().items() if "num_batches_tracked" not in name]
+    return [val.cpu().numpy() for name, val in net.state_dict().items() if model.is_head_param(name)]
+
+
+def select_precision(requested, device):
+    """Auto-detekcja precyzji ekstraktora: przy braku akceleracji sprzetowej (CPU)
+    obniza precyzje do FP16. Jawne fp32/fp16/int8 pomijaja detekcje."""
+    if requested != "auto":
+        return requested
+    accelerated = device.type == "cuda"
+    return "fp32" if accelerated else "fp16"
 
 
 class FlowerClient(fl.client.NumPyClient):
@@ -123,13 +138,23 @@ def main():
 
     engine.set_seed()
     device = torch.device(args.device if torch.cuda.is_available() and args.device == 'cuda' else "cpu")
-    print(f"Client {args.cid} starting on device: {device} in {args.mode.upper()} mode")
 
-    net = model.Autoencoder(extractor_name=args.extractor).to(device)
+    precision = select_precision(args.extractor_precision, device)
+    if precision == "int8" and device.type != "cpu":
+        print(f"[Client {args.cid}] INT8 requires CPU (qnnpack) -- switching device to CPU.")
+        device = torch.device("cpu")
+    if args.extractor_precision == "auto":
+        print(f"[Client {args.cid}] Auto-detected precision: {precision} "
+              f"({'accelerator present' if device.type == 'cuda' else 'no accelerator'}).")
+    print(f"Client {args.cid} starting on device: {device} in {args.mode.upper()} mode | extractor: {precision}")
+
+    net = model.Autoencoder(extractor_name=args.extractor, extractor_precision=precision).to(device)
     trainloader = dataset.load_partitioned_data(
         args.cid, args.total_clients, args.data_path, args.dataset, args.class_name, args.apply_shift,
         num_workers=args.num_workers, pin_memory=(device.type == "cuda"), partition_mode=args.partition_mode
     )
+    if precision == "int8":
+        net.calibrate(trainloader)  # kalibracja + konwersja INT8 na lokalnych danych
 
     fl.client.start_numpy_client(
         server_address=f"{args.server_ip}:8080",

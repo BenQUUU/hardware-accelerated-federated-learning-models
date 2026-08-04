@@ -80,7 +80,9 @@ def get_evaluate_fn(data_path, dataset_name, class_names):
     def evaluate(server_round: int, parameters: fl.common.NDArrays, config: dict):
         net = model.Autoencoder(extractor_name=args.extractor).to(DEVICE)
 
-        valid_keys = [k for k in net.state_dict().keys() if "num_batches_tracked" not in k]
+        # Zagregowane parametry to TYLKO glowica (bottleneck + decoder). Ekstraktor serwera
+        # pozostaje FP32 -- model globalny oceniamy na pelnej precyzji jako punkt odniesienia.
+        valid_keys = [k for k in net.state_dict().keys() if model.is_head_param(k)]
 
         if len(valid_keys) != len(parameters):
             print(
