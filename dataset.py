@@ -101,7 +101,8 @@ class IndustrialAnomalyDataset(Dataset):
             return image, label
 
 def load_partitioned_data(cid, total_clients, data_path, dataset_name, class_name, apply_shift=False,
-                          batch_size=8, num_workers=0, pin_memory=False, partition_mode="split"):
+                          batch_size=8, num_workers=0, pin_memory=False, partition_mode="split",
+                          mix_classes=None, mix_ratio=None):
     base_transforms = [
         transforms.Resize((IMG_SIZE, IMG_SIZE)),
         transforms.ToTensor(),
@@ -129,6 +130,28 @@ def load_partitioned_data(cid, total_clients, data_path, dataset_name, class_nam
         # Podzialem jest samo przypisanie klasy, wiec nie tniemy zbioru na partycje.
         client_dataset = full_dataset
         print(f"[Client {cid}] WHOLE mode: using the full class '{class_name}' ({total_files} training images).")
+    elif partition_mode == "mix":
+        # Non-IID z wymieszaniem: klasa dominujaca (class_name) + szczatkowo pozostale (mix_classes),
+        # wg proporcji mix_ratio [dominujaca, minor1, ...]. Budzet = rozmiar klasy dominujacej,
+        # dzieki czemu 100-0-0 pokrywa sie z trybem 'whole' (ciaglosc z bazowym S7).
+        minors = [c.strip() for c in mix_classes.split(",")] if mix_classes else []
+        ratios = [float(x) for x in mix_ratio.split(",")] if mix_ratio else []
+        classes = [class_name] + minors
+        if len(ratios) != len(classes):
+            raise ValueError("mix_ratio musi miec tyle wartosci co (klasa dominujaca + mix_classes).")
+        subsets = []
+        for i, (cls, p) in enumerate(zip(classes, ratios)):
+            n = round(total_files * p / 100.0)
+            if n <= 0:
+                continue
+            ds_i = full_dataset if i == 0 else IndustrialAnomalyDataset(
+                dataset_name, data_path, cls, is_train=True, transform=client_transform)
+            gen = torch.Generator().manual_seed(42 + i)
+            idx = torch.randperm(len(ds_i), generator=gen).tolist()[:n]
+            subsets.append(torch.utils.data.Subset(ds_i, idx))
+        client_dataset = torch.utils.data.ConcatDataset(subsets)
+        comp = ", ".join(f"{c}={round(total_files * p / 100)}" for c, p in zip(classes, ratios))
+        print(f"[Client {cid}] MIX mode: {comp} (total {len(client_dataset)} images).")
     else:
         # Tryb 'split': jedna klasa dzielona rowno na total_clients (dane ~IID).
         partition_size = total_files // total_clients

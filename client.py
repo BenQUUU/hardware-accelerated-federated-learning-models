@@ -28,8 +28,12 @@ def parse_args():
     parser.add_argument("--num_workers", type=int, default=0, help="DataLoader worker processes. Dziala na Windows/Linux (setup jest pod main()).")
     parser.add_argument("--weighting", type=str, choices=["steps", "dataset"], default="steps",
                         help="FedAvg weighting for 'time' mode: 'steps' = number of processed samples (rewards faster hardware), 'dataset' = dataset size (classic FedAvg, decoupled from hardware speed).")
-    parser.add_argument("--partition_mode", type=str, choices=["split", "whole"], default="split",
-                        help="'split' = one class split across clients (data ~ IID); 'whole' = each client takes the entire class (different classes per client => non-IID data).")
+    parser.add_argument("--partition_mode", type=str, choices=["split", "whole", "mix"], default="split",
+                        help="'split' = one class split across clients (data ~ IID); 'whole' = each client takes the entire class (different classes per client => non-IID data); 'mix' = dominant class + small fractions of the others (see --mix_classes / --mix_ratio).")
+    parser.add_argument("--mix_classes", type=str, default=None,
+                        help="For partition_mode 'mix': comma-separated minor classes besides --class_name (e.g. 'hazelnut,bottle').")
+    parser.add_argument("--mix_ratio", type=str, default=None,
+                        help="For 'mix': comma-separated percentages 'dominant,minor1,...' summing to ~100 (e.g. '90,5,5').")
     parser.add_argument("--extractor_precision", type=str, choices=["fp32", "fp16", "int8", "auto"], default="fp32",
                         help="Precision of the FROZEN feature extractor (the trainable head stays FP32). "
                              "'auto' = fp32 with acceleration (CUDA), fp16 without. "
@@ -154,7 +158,8 @@ def main():
     net = model.Autoencoder(extractor_name=args.extractor, extractor_precision=precision).to(device)
     trainloader = dataset.load_partitioned_data(
         args.cid, args.total_clients, args.data_path, args.dataset, args.class_name, args.apply_shift,
-        num_workers=args.num_workers, pin_memory=(device.type == "cuda"), partition_mode=args.partition_mode
+        num_workers=args.num_workers, pin_memory=(device.type == "cuda"), partition_mode=args.partition_mode,
+        mix_classes=args.mix_classes, mix_ratio=args.mix_ratio
     )
     if precision == "int8":
         net.calibrate(trainloader)  # kalibracja + konwersja INT8 na lokalnych danych
